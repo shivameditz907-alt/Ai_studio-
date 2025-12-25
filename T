@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 18K Crystal Clear Photo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #050505; color: #fff; font-family: 'Poppins', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+        .loader { border-top-color: #3b82f6; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #resultImg { max-height: 500px; object-fit: contain; }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="text-center mb-10">
+        <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">AI 18K BLUR REMOVER</h1>
+        <p class="text-gray-500 mt-2 text-sm uppercase tracking-widest">Powered by Real-ESRGAN Technology</p>
+    </div>
+
+    <div class="glass p-8 rounded-[2rem] w-full max-w-xl shadow-2xl">
+        
+        <!-- Step 1: Upload -->
+        <div id="upload-box" class="border-2 border-dashed border-gray-700 rounded-2xl p-10 text-center cursor-pointer hover:border-blue-500 transition-all bg-white/5" onclick="document.getElementById('fileInput').click()">
+            <span class="text-5xl">🖼️</span>
+            <p class="mt-4 text-gray-300">Blur Photo Select Karein</p>
+            <input type="file" id="fileInput" class="hidden" accept="image/*" onchange="previewImage(event)">
+        </div>
+
+        <!-- Step 2: Preview & Process -->
+        <div id="preview-section" class="hidden mt-6 text-center">
+            <img id="imagePreview" class="w-full rounded-xl mb-4 shadow-lg border border-white/10" src="#">
+            <button onclick="startEnhance()" id="enhanceBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-transform active:scale-95">
+                REMOVE BLUR & MAKE 18K
+            </button>
+        </div>
+
+        <!-- Step 3: Processing -->
+        <div id="loading" class="hidden mt-6 text-center py-6">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-900 h-12 w-12 mb-4 mx-auto"></div>
+            <p class="text-blue-400 font-medium">AI photo ko saaf kar raha hai...</p>
+            <p class="text-gray-500 text-xs mt-2">Isme 10-20 seconds lag sakte hain</p>
+        </div>
+
+        <!-- Step 4: Result -->
+        <div id="result-section" class="hidden mt-6">
+            <h3 class="text-emerald-400 font-bold mb-2">✨ 18K Ultra HD Result:</h3>
+            <img id="resultImg" class="w-full rounded-xl mb-4 border-2 border-emerald-500/50" src="#">
+            <a id="downloadBtn" href="#" download="enhanced_photo.png" class="block text-center w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl transition-all">
+                DOWNLOAD CLEAR PHOTO
+            </a>
+            <button onclick="location.reload()" class="w-full mt-4 text-gray-500 text-sm">Upload New Photo</button>
+        </div>
+    </div>
+
+    <script>
+        // AAPKI REPLICATE KEY
+        const REPLICATE_TOKEN = "r8_RximHjO1Wj6j1R7LQy2IdAZgRhisGNV02R8Wr";
+
+        let base64Image = "";
+
+        function previewImage(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function() {
+                base64Image = reader.result;
+                document.getElementById('imagePreview').src = reader.result;
+                document.getElementById('upload-box').classList.add('hidden');
+                document.getElementById('preview-section').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function startEnhance() {
+            document.getElementById('preview-section').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+
+            try {
+                // 1. Prediction Start Karo
+                const response = await fetch("https://api.replicate.com/v1/predictions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Token ${REPLICATE_TOKEN}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        version: "da8df9d2466046e755259929007f794347b744b76c5b29b9f7a75ca8280f555c", // Real-ESRGAN Model
+                        input: { 
+                            image: base64Image,
+                            upscale: 4, // 18K ke liye scale badhaya ja sakta hai
+                            face_enhance: true
+                        }
+                    })
+                });
+
+                let prediction = await response.json();
+                const predictionId = prediction.id;
+
+                // 2. Status Check Karo (Polling)
+                const checkStatus = setInterval(async () => {
+                    const statusRes = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
+                        headers: { "Authorization": `Token ${REPLICATE_TOKEN}` }
+                    });
+                    const statusData = await statusRes.json();
+
+                    if (statusData.status === "succeeded") {
+                        clearInterval(checkStatus);
+                        showResult(statusData.output);
+                    } else if (statusData.status === "failed") {
+                        clearInterval(checkStatus);
+                        alert("AI Processing fail ho gayi.");
+                        location.reload();
+                    }
+                }, 2000); // Har 2 second mein check karega
+
+            } catch (error) {
+                console.error(error);
+                alert("Error: API connect nahi ho rahi.");
+                location.reload();
+            }
+        }
+
+        function showResult(outputUrl) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('result-section').classList.remove('hidden');
+            document.getElementById('resultImg').src = outputUrl;
+            document.getElementById('downloadBtn').href = outputUrl;
+        }
+    </script>
+</body>
+</html>
